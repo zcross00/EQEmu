@@ -21,6 +21,7 @@
 #include "common/eqemu_logsys.h"
 #ifdef EQEMU_LAB_INSTRUMENTATION
 #include "common/lab/lab_event_emitter.h"
+#include <sstream>
 #endif
 #include "common/features.h"
 #include "common/repositories/alternate_currency_repository.h"
@@ -165,8 +166,46 @@ bool Zone::Bootup(uint32 iZoneID, uint32 iInstanceID, bool is_static) {
 
 #ifdef EQEMU_LAB_INSTRUMENTATION
 	// Observable Lab: start the event emitter now the zone identity is known.
-	lab::EmitterSetControlHandler([](const std::string &cat, int lvl) {
-		EQEmuLogSys::Instance()->SetCategoryLevel(cat, static_cast<uint8>(lvl));
+	// Generic control dispatcher — runs on the MAIN zone thread (drained by
+	// lab::EmitterProcessControls in the tick), so entity access is safe. First
+	// token is the verb; a trailing entity name is read as the rest-of-line.
+	lab::EmitterSetControlHandler([](const std::string &verb, const std::string &args) {
+		std::istringstream iss(args);
+		if (verb == "set_log_level") {
+			int level = 0;
+			iss >> level;
+			std::string category;
+			std::getline(iss, category);
+			const size_t s = category.find_first_not_of(" \t");
+			if (s != std::string::npos) {
+				EQEmuLogSys::Instance()->SetCategoryLevel(category.substr(s), static_cast<uint8>(level));
+			}
+		}
+		else if (verb == "set_hp") {
+			int64 hp = 0;
+			iss >> hp;
+			std::string name;
+			std::getline(iss, name);
+			const size_t s = name.find_first_not_of(" \t");
+			if (s != std::string::npos) {
+				if (Mob *m = entity_list.GetMob(name.substr(s).c_str())) {
+					m->SetHP(hp);
+					m->SendHPUpdate(true);
+				}
+			}
+		}
+		else if (verb == "teleport") {
+			float x = 0.0f, y = 0.0f, z = 0.0f, h = 0.0f;
+			iss >> x >> y >> z >> h;
+			std::string name;
+			std::getline(iss, name);
+			const size_t s = name.find_first_not_of(" \t");
+			if (s != std::string::npos) {
+				if (Mob *m = entity_list.GetMob(name.substr(s).c_str())) {
+					m->GMMove(x, y, z, h, false);
+				}
+			}
+		}
 	});
 	lab::EmitterStart("eq", zone->GetShortName(), zone->GetInstanceID());
 #endif

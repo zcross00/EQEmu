@@ -18,7 +18,11 @@ namespace lab {
 // Set the handler invoked when the gateway pushes a control command back over
 // the emitter socket. Call this BEFORE EmitterStart so it is visible to the
 // reader thread without a race.
-void EmitterSetControlHandler(std::function<void(const std::string &category, int level)> handler);
+void EmitterSetControlHandler(std::function<void(const std::string &verb, const std::string &args)> handler);
+
+// Drain queued control commands, running the registered handler for each. Call
+// once per main zone tick so handlers execute on the main thread (entity-safe).
+void EmitterProcessControls();
 
 // Start the background emitter for this process. `addr` is "host:port"; if
 // empty, falls back to $LAB_EMIT_ADDR, then 127.0.0.1:7701. Idempotent.

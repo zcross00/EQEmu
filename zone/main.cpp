@@ -599,6 +599,9 @@ int main(int argc, char **argv)
 		}
 
 		if (is_zone_loaded) {
+#ifdef EQEMU_LAB_INSTRUMENTATION
+			lab::EmitterProcessControls(); // run queued lab control commands on the main thread
+#endif
 			{
 				entity_list.GroupProcess();
 				entity_list.DoorProcess();

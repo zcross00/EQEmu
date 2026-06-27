@@ -50,8 +50,13 @@ struct Emitter {
 	std::atomic<bool>       running{false};
 	std::thread             worker;
 
-	// Control back-channel: gateway -> server.
-	std::function<void(const std::string &, int)> control_handler;
+	// Control back-channel: gateway -> server. Generic (verb, args); the
+	// zone-registered handler parses args per verb.
+	std::function<void(const std::string &, const std::string &)> control_handler;
+	// Commands are queued by the reader thread and drained on the main zone thread
+	// (EmitterProcessControls) so handlers can touch the entity list safely.
+	std::mutex                                       control_mtx;
+	std::deque<std::pair<std::string, std::string>>  control_queue;
 
 	void run();
 	int  connect_socket();
@@ -148,22 +153,24 @@ int Emitter::connect_socket()
 #endif
 }
 
-// Apply one control line, e.g. "set_log_level Combat 0".
+// Apply one control line, e.g. "set_log_level 0 Combat" or "set_hp 1 a rodent".
+// Generic: first token = verb, rest of the line = args (so a trailing entity
+// name with spaces survives). The zone-registered handler parses args per verb.
 void Emitter::handle_control_line(const std::string &line)
 {
-	// Wire form: "set_log_level <level> <category…>" — level first so a
-	// category with spaces (e.g. "Quest Debug") is the rest of the line.
 	std::istringstream iss(line);
 	std::string        verb;
-	int                level = 0;
-	iss >> verb >> level;
-	std::string category;
-	std::getline(iss, category);
-	const size_t start = category.find_first_not_of(" \t");
-	category = (start == std::string::npos) ? std::string() : category.substr(start);
-	if (verb == "set_log_level" && !category.empty() && control_handler) {
-		control_handler(category, level);
+	iss >> verb;
+	std::string args;
+	std::getline(iss, args);
+	const size_t start = args.find_first_not_of(" \t");
+	args = (start == std::string::npos) ? std::string() : args.substr(start);
+	if (verb.empty()) {
+		return;
 	}
+	// Queue for the main zone thread to execute (see EmitterProcessControls).
+	std::lock_guard<std::mutex> lk(control_mtx);
+	control_queue.emplace_back(std::move(verb), std::move(args));
 }
 
 void Emitter::read_control(int fd)
@@ -237,9 +244,26 @@ void Emitter::run()
 
 } // namespace
 
-void EmitterSetControlHandler(std::function<void(const std::string &category, int level)> handler)
+void EmitterSetControlHandler(std::function<void(const std::string &verb, const std::string &args)> handler)
 {
 	g_emitter.control_handler = std::move(handler);
+}
+
+void EmitterProcessControls()
+{
+	if (!g_emitter.control_handler) {
+		return;
+	}
+	// Swap the queue out under the lock, then run handlers unlocked on the caller's
+	// (main zone) thread so they can safely touch the entity list.
+	std::deque<std::pair<std::string, std::string>> pending;
+	{
+		std::lock_guard<std::mutex> lk(g_emitter.control_mtx);
+		pending.swap(g_emitter.control_queue);
+	}
+	for (auto &cmd : pending) {
+		g_emitter.control_handler(cmd.first, cmd.second);
+	}
 }
 
 void EmitterStart(
