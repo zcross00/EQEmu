@@ -171,6 +171,26 @@ bool Zone::Bootup(uint32 iZoneID, uint32 iInstanceID, bool is_static) {
 	// token is the verb; a trailing entity name is read as the rest-of-line.
 	lab::EmitterSetControlHandler([](const std::string &verb, const std::string &args) {
 		std::istringstream iss(args);
+		// Resolve a target by the verbs' documented clean-name addressing: try the
+		// raw-name index first (exact — e.g. players), then fall back to a clean-name
+		// scan (spawned NPCs carry a numeric suffix in their raw name, so a friendly
+		// name like "TestGoblin" would otherwise never match).
+		auto resolve_target = [](const std::string &n) -> Mob * {
+			if (n.empty()) {
+				return nullptr;
+			}
+			if (Mob *m = entity_list.GetMob(n.c_str())) {
+				return m;
+			}
+			std::list<Mob *> mobs;
+			entity_list.GetMobList(mobs);
+			for (Mob *m : mobs) {
+				if (m && strcasecmp(m->GetCleanName(), n.c_str()) == 0) {
+					return m;
+				}
+			}
+			return nullptr;
+		};
 		if (verb == "set_log_level") {
 			int level = 0;
 			iss >> level;
@@ -188,7 +208,7 @@ bool Zone::Bootup(uint32 iZoneID, uint32 iInstanceID, bool is_static) {
 			std::getline(iss, name);
 			const size_t s = name.find_first_not_of(" \t");
 			if (s != std::string::npos) {
-				if (Mob *m = entity_list.GetMob(name.substr(s).c_str())) {
+				if (Mob *m = resolve_target(name.substr(s))) {
 					m->SetHP(hp);
 					m->SendHPUpdate(true);
 				}
@@ -201,7 +221,7 @@ bool Zone::Bootup(uint32 iZoneID, uint32 iInstanceID, bool is_static) {
 			std::getline(iss, name);
 			const size_t s = name.find_first_not_of(" \t");
 			if (s != std::string::npos) {
-				if (Mob *m = entity_list.GetMob(name.substr(s).c_str())) {
+				if (Mob *m = resolve_target(name.substr(s))) {
 					m->GMMove(x, y, z, h, false);
 				}
 			}
@@ -227,6 +247,44 @@ bool Zone::Bootup(uint32 iZoneID, uint32 iInstanceID, bool is_static) {
 			const size_t s = action.find_first_not_of(" \t");
 			if (s != std::string::npos) {
 				lab::SimControl(action.substr(s), count);
+			}
+		}
+		else if (verb == "snapshot") {
+			// "<slot> <entity name…>" — capture the entity's live state and emit
+			// it as a Snapshot event the gateway stores under <slot>.
+			std::string slot;
+			iss >> slot;
+			std::string name;
+			std::getline(iss, name);
+			const size_t s = name.find_first_not_of(" \t");
+			if (!slot.empty() && s != std::string::npos) {
+				if (Mob *m = resolve_target(name.substr(s))) {
+					lab::EmitSnapshot(
+						slot.c_str(), m->GetCleanName(),
+						m->GetX(), m->GetY(), m->GetZ(), m->GetHeading(),
+						static_cast<int>(m->GetHP()), m->GetLevel());
+				}
+			}
+		}
+		else if (verb == "restore") {
+			// "<x> <y> <z> <h> <hp> <level> <entity name…>" — replay a captured
+			// slot onto the entity in one atomic step (numeric args first).
+			float x = 0.0f, y = 0.0f, z = 0.0f, h = 0.0f;
+			int64 hp = 0;
+			int   level = 0;
+			iss >> x >> y >> z >> h >> hp >> level;
+			std::string name;
+			std::getline(iss, name);
+			const size_t s = name.find_first_not_of(" \t");
+			if (s != std::string::npos) {
+				if (Mob *m = resolve_target(name.substr(s))) {
+					m->GMMove(x, y, z, h, false);
+					m->SetHP(hp);
+					if (level > 0) {
+						m->SetLevel(static_cast<uint8>(level));
+					}
+					m->SendHPUpdate(true);
+				}
 			}
 		}
 	});

@@ -409,6 +409,19 @@ void EmitHpUpdate(const char *name, int hp_pct, float x, float y, float z)
 	enqueue_event(kind);
 }
 
+void EmitSnapshot(const char *slot, const char *target, float x, float y, float z, float heading, int hp, int level)
+{
+	std::string kind = "{\"type\":\"snapshot\",\"slot\":\"";
+	kind += json_escape(slot ? slot : "");
+	kind += "\",\"target\":\"";
+	kind += json_escape(target ? target : "");
+	kind += "\",\"at\":" + vec3_json(x, y, z);
+	kind += ",\"heading\":" + std::to_string(heading);
+	kind += ",\"hp\":" + std::to_string(hp);
+	kind += ",\"level\":" + std::to_string(level) + "}";
+	enqueue_event(kind);
+}
+
 void EmitterStop()
 {
 	if (!g_emitter.running.exchange(false)) {

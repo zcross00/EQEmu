@@ -47,6 +47,10 @@ void EmitDeath(const char *victim, const char *killer, int victim_level, float x
 void EmitLoot(const char *looter, const char *corpse_of, unsigned int item_id, const char *item_name, float x, float y, float z);
 void EmitSpawn(const char *name, bool npc, int level, float x, float y, float z);
 void EmitHpUpdate(const char *name, int hp_pct, float x, float y, float z);
+// Capture of one entity's live state into a named slot (Observable Lab Phase 4d).
+// Emitted on demand in response to a `snapshot` control verb; the gateway folds
+// it into a slot store that a `restore` verb replays.
+void EmitSnapshot(const char *slot, const char *target, float x, float y, float z, float heading, int hp, int level);
 
 // Stop and join the worker (process shutdown). Safe if never started.
 void EmitterStop();
