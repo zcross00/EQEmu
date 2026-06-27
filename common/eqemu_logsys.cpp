@@ -481,6 +481,28 @@ void EQEmuLogSys::Out(
 	if (l.log_to_discord_enabled && m_on_log_discord_hook) {
 		m_on_log_discord_hook(log_category, log_settings[log_category].discord_webhook_id, output_message);
 	}
+#ifdef EQEMU_LAB_INSTRUMENTATION
+	if (m_on_log_event_hook) {
+		m_on_log_event_hook(log_category, output_message);
+	}
+#endif
+}
+
+// Observable Lab: hot-toggle a log category's verbosity in memory (no restart).
+// Toggling a category off also stops its mirrored event stream, since Out()
+// early-returns when no sink is enabled for the category.
+void EQEmuLogSys::SetCategoryLevel(const std::string &category_name, uint8 level)
+{
+	for (int i = 0; i < Logs::LogCategory::MaxCategoryID; i++) {
+		if (category_name == Logs::LogCategoryName[i]) {
+			log_settings[i].log_to_console      = level;
+			log_settings[i].log_to_file         = level;
+			log_settings[i].is_category_enabled =
+				(log_settings[i].log_to_console || log_settings[i].log_to_file ||
+				 log_settings[i].log_to_gmsay || log_settings[i].log_to_discord) ? 1 : 0;
+			return;
+		}
+	}
 }
 
 /**

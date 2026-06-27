@@ -20,6 +20,9 @@
 #include "common/eq_packet_structs.h"
 #include "common/eq_stream_ident.h"
 #include "common/eqemu_logsys.h"
+#ifdef EQEMU_LAB_INSTRUMENTATION
+#include "common/lab/lab_event_emitter.h"
+#endif
 #include "common/events/player_event_logs.h"
 #include "common/evolving_items.h"
 #include "common/file.h"
@@ -279,6 +282,9 @@ int main(int argc, char **argv)
 		->SetLogPath(PathManager::Instance()->GetLogPath())
 		->LoadLogDatabaseSettings(ZoneCLI::RanTestCommand(argc, argv))
 		->SetGMSayHandler(&Zone::GMSayHookCallBackProcess)
+#ifdef EQEMU_LAB_INSTRUMENTATION
+		->SetEventHandler([](uint16 cat, const std::string &msg) { lab::EmitLogLine(Logs::LogCategoryName[cat], "Info", msg); })
+#endif
 		->StartFileLogs();
 
 	if (ZoneCLI::RanTestCommand(argc, argv)) {

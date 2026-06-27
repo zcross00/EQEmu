@@ -24,6 +24,9 @@
 #include "common/repositories/character_data_repository.h"
 #include "common/spdat.h"
 #include "common/strings.h"
+#ifdef EQEMU_LAB_INSTRUMENTATION
+#include "common/lab/lab_event_emitter.h"
+#endif
 #include "zone/bot.h"
 #include "zone/dialogue_window.h"
 #include "zone/mob_movement_manager.h"
@@ -1571,6 +1574,10 @@ void Mob::SendHPUpdate(bool force_update_all)
 		LogHPUpdate("HP Changed for mob [{}] send update", GetCleanName());
 
 		last_hp_percent = current_hp_percent;
+#ifdef EQEMU_LAB_INSTRUMENTATION
+		// Observable Lab: typed HP event — fires only on integer-percent change (free throttle).
+		lab::EmitHpUpdate(GetCleanName(), current_hp_percent, GetX(), GetY(), GetZ());
+#endif
 	}
 
 	EQApplicationPacket hp_packet;

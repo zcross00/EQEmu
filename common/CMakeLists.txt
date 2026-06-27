@@ -37,6 +37,7 @@ set(common_sources
     eqemu_config.cpp
     eqemu_exception.cpp
     eqemu_logsys.cpp
+    lab/lab_event_emitter.cpp
     eqtime.cpp
     event_sub.cpp
     event/event_loop.cpp

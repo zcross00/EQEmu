@@ -398,6 +398,12 @@ public:
 			const std::string &
 		)> f
 	) { m_on_log_console_hook = f; }
+
+	// Observable Lab: structured event sink (forwards every logged message).
+	EQEmuLogSys *SetEventHandler(std::function<void(uint16 log_category, const std::string &)> f) { m_on_log_event_hook = f; return this; }
+
+	// Observable Lab: in-memory hot-toggle of a category's verbosity (no restart).
+	void SetCategoryLevel(const std::string &category_name, uint8 level);
 	void SilenceConsoleLogging();
 	void EnableConsoleLogging();
 
@@ -417,6 +423,7 @@ private:
 	std::function<void(uint16 log_category, const char *func, const std::string &)> m_on_log_gmsay_hook;
 	std::function<void(uint16 log_category, int webhook_id, const std::string &)>   m_on_log_discord_hook;
 	std::function<void(uint16 log_category, const std::string &)>                   m_on_log_console_hook;
+	std::function<void(uint16 log_category, const std::string &)>                   m_on_log_event_hook;
 	DiscordWebhooks                                                                 m_discord_webhooks[MAX_DISCORD_WEBHOOK_ID]{};
 	bool                                                                            m_file_logs_enabled = false;
 	int                                                                             m_log_platform      = 0;

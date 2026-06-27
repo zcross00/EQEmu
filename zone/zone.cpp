@@ -19,6 +19,9 @@
 
 #include "common/data_verification.h"
 #include "common/eqemu_logsys.h"
+#ifdef EQEMU_LAB_INSTRUMENTATION
+#include "common/lab/lab_event_emitter.h"
+#endif
 #include "common/features.h"
 #include "common/repositories/alternate_currency_repository.h"
 #include "common/repositories/buyer_repository.h"
@@ -159,6 +162,14 @@ bool Zone::Bootup(uint32 iZoneID, uint32 iInstanceID, bool is_static) {
 	 * Set Logging
 	 */
 	EQEmuLogSys::Instance()->StartFileLogs(StringFormat("%s_version_%u_inst_id_%u_port_%u", zone->GetShortName(), zone->GetInstanceVersion(), zone->GetInstanceID(), ZoneConfig::get()->ZonePort));
+
+#ifdef EQEMU_LAB_INSTRUMENTATION
+	// Observable Lab: start the event emitter now the zone identity is known.
+	lab::EmitterSetControlHandler([](const std::string &cat, int lvl) {
+		EQEmuLogSys::Instance()->SetCategoryLevel(cat, static_cast<uint8>(lvl));
+	});
+	lab::EmitterStart("eq", zone->GetShortName(), zone->GetInstanceID());
+#endif
 
 	return true;
 }

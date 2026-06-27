@@ -20,6 +20,9 @@
 #include "common/data_verification.h"
 #include "common/features.h"
 #include "common/guilds.h"
+#ifdef EQEMU_LAB_INSTRUMENTATION
+#include "common/lab/lab_event_emitter.h"
+#endif
 #include "zone/bot.h"
 #include "zone/dialogue_window.h"
 #include "zone/dynamic_zone.h"
@@ -694,6 +697,13 @@ void EntityList::AddNPC(NPC *npc, bool send_spawn_packet, bool dont_queue)
 	}
 
 	npc->SetSpawned();
+
+#ifdef EQEMU_LAB_INSTRUMENTATION
+	// Observable Lab: typed spawn event. The emitter drops the zone-boot flood
+	// (settle window) so only post-boot repops/roamers/summons reach the spine —
+	// live reinforcement of the world-model's danger/level regions.
+	lab::EmitSpawn(npc->GetCleanName(), true, npc->GetLevel(), npc->GetX(), npc->GetY(), npc->GetZ());
+#endif
 
 	if (send_spawn_packet) {
 		if (dont_queue) {

@@ -20,6 +20,9 @@
 #include "common/data_verification.h"
 #include "common/eqemu_logsys.h"
 #include "common/events/player_event_logs.h"
+#ifdef EQEMU_LAB_INSTRUMENTATION
+#include "common/lab/lab_event_emitter.h"
+#endif
 #include "common/json/json.hpp"
 #include "common/repositories/character_corpse_items_repository.h"
 #include "common/repositories/character_corpses_repository.h"
@@ -1623,6 +1626,24 @@ void Corpse::LootCorpseItem(Client *c, const EQApplicationPacket *app)
 
 			RecordPlayerEventLogWithClient(c, PlayerEvent::LOOT_ITEM, e);
 		}
+
+#ifdef EQEMU_LAB_INSTRUMENTATION
+		// Observable Lab: typed loot event — item granted from an NPC corpse.
+		// Feeds the world-model's loot-source map; position is the corpse's.
+		// RemoveNumbers mutates in place, so de-number a local copy to get a
+		// clean NPC-type name without disturbing corpse_name's later use.
+		if (inst && !IsPlayerCorpse()) {
+			char clean_corpse[64];
+			strn0cpy(clean_corpse, corpse_name, sizeof(clean_corpse));
+			lab::EmitLoot(
+				c->GetCleanName(),
+				EntityList::RemoveNumbers(clean_corpse),
+				inst->GetItem()->ID,
+				inst->GetItem()->Name,
+				GetX(), GetY(), GetZ()
+			);
+		}
+#endif
 
 		if (!IsPlayerCorpse()) {
 			// dynamic zones may prevent looting by non-members or based on lockouts

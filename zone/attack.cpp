@@ -19,6 +19,9 @@
 #include "common/eq_constants.h"
 #include "common/eq_packet_structs.h"
 #include "common/events/player_event_logs.h"
+#ifdef EQEMU_LAB_INSTRUMENTATION
+#include "common/lab/lab_event_emitter.h"
+#endif
 #include "common/misc_functions.h"
 #include "common/rulesys.h"
 #include "common/spdat.h"
@@ -1817,6 +1820,11 @@ bool Client::Death(Mob* killer_mob, int64 damage, uint16 spell, EQ::skills::Skil
 		return false;
 	}
 
+#ifdef EQEMU_LAB_INSTRUMENTATION
+	// Observable Lab: typed death event — a player death is a strong danger signal.
+	lab::EmitDeath(GetCleanName(), killer_mob ? killer_mob->GetCleanName() : "", GetLevel(), GetX(), GetY(), GetZ());
+#endif
+
 	if (!spell) {
 		spell = SPELL_UNKNOWN;
 	}
@@ -2469,6 +2477,10 @@ void NPC::Damage(Mob* other, int64 damage, uint16 spell_id, EQ::skills::SkillTyp
 
 bool NPC::Death(Mob* killer_mob, int64 damage, uint16 spell, EQ::skills::SkillType attack_skill, KilledByTypes killed_by, bool is_buff_tic)
 {
+#ifdef EQEMU_LAB_INSTRUMENTATION
+	// Observable Lab: typed death event (covers bots too — Bot::Death calls NPC::Death).
+	lab::EmitDeath(GetCleanName(), killer_mob ? killer_mob->GetCleanName() : "", GetLevel(), GetX(), GetY(), GetZ());
+#endif
 	LogCombat(
 		"Fatal blow dealt by [{}] with [{}] damage, spell [{}], skill [{}]",
 		(killer_mob ? killer_mob->GetName() : "[nullptr]"),
