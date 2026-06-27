@@ -206,6 +206,29 @@ bool Zone::Bootup(uint32 iZoneID, uint32 iInstanceID, bool is_static) {
 				}
 			}
 		}
+		else if (verb == "spawn") {
+			float x = 0.0f, y = 0.0f, z = 0.0f;
+			int   level = 0;
+			iss >> x >> y >> z >> level;
+			std::string name;
+			std::getline(iss, name);
+			const size_t s = name.find_first_not_of(" \t");
+			if (s != std::string::npos) {
+				// "<name> <race=1> <level>" — SpawnNPC parses + strips numbers / '_'->' '.
+				const std::string cmd = name.substr(s) + " 1 " + std::to_string(level > 0 ? level : 1);
+				NPC::SpawnNPC(cmd.c_str(), glm::vec4(x, y, z, 0.0f), nullptr);
+			}
+		}
+		else if (verb == "sim_time") {
+			int count = 0;
+			iss >> count;
+			std::string action;
+			std::getline(iss, action);
+			const size_t s = action.find_first_not_of(" \t");
+			if (s != std::string::npos) {
+				lab::SimControl(action.substr(s), count);
+			}
+		}
 	});
 	lab::EmitterStart("eq", zone->GetShortName(), zone->GetInstanceID());
 #endif

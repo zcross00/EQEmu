@@ -66,6 +66,12 @@ struct Emitter {
 
 Emitter g_emitter;
 
+// Sim-clock gate (pause/step) for sim-time control. Read/written only on the main
+// zone thread (the control dispatcher and the tick both run there), so plain
+// statics suffice — no atomics needed.
+bool g_sim_paused = false;
+int  g_sim_steps  = 0;
+
 std::string json_escape(const std::string &s)
 {
 	std::string out;
@@ -264,6 +270,33 @@ void EmitterProcessControls()
 	for (auto &cmd : pending) {
 		g_emitter.control_handler(cmd.first, cmd.second);
 	}
+}
+
+void SimControl(const std::string &action, int count)
+{
+	if (action == "pause") {
+		g_sim_paused = true;
+	}
+	else if (action == "resume" || action == "play") {
+		g_sim_paused = false;
+		g_sim_steps  = 0;
+	}
+	else if (action == "step") {
+		g_sim_paused = true;
+		g_sim_steps += (count > 0 ? count : 1);
+	}
+}
+
+bool SimShouldProcess()
+{
+	if (!g_sim_paused) {
+		return true;
+	}
+	if (g_sim_steps > 0) {
+		g_sim_steps--;
+		return true;
+	}
+	return false;
 }
 
 void EmitterStart(

@@ -24,6 +24,12 @@ void EmitterSetControlHandler(std::function<void(const std::string &verb, const 
 // once per main zone tick so handlers execute on the main thread (entity-safe).
 void EmitterProcessControls();
 
+// Sim-time gate. SimControl (dispatcher, main thread) sets pause/resume/step;
+// SimShouldProcess() (main loop, each tick) returns false while paused, except
+// it lets queued steps through one tick at a time.
+void SimControl(const std::string &action, int count);
+bool SimShouldProcess();
+
 // Start the background emitter for this process. `addr` is "host:port"; if
 // empty, falls back to $LAB_EMIT_ADDR, then 127.0.0.1:7701. Idempotent.
 void EmitterStart(const std::string &source_driver,
